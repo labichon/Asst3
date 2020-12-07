@@ -24,6 +24,7 @@ int main(int argc, char** argv){
 		return 0;
 	}
 	
+	//service given in command line
 	char* port = argv[1];
 
 	// char from server
@@ -31,36 +32,38 @@ int main(int argc, char** argv){
 	char* setup = "REG|4|Who.|";
 	char* punch = "REG|30|I didn't know you were an owl";
 
+	struct addrinfo hint, *address_list, *addr;
+        memset(&hint, 0, sizeof(struct addrinfo));
+        hint.ai_family = AF_UNSPEC;
+        hint.ai_socktype = SOCK_STREAM;
+        hint.ai_flags = AI_PASSIVE;
+        if(getaddrinfo(NULL, port, &hint, &address_list) != 0){
+                printf("error\n");
+                return 0;
+        }
+
 	//socket creation
 	int sockfd;
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-		printf("error, socket could not be created\n");
-		return 0;
-	}
-	
-	
-	// this is flimsy, i'm not even sure if we need this
-	struct addrinfo hint, *address_list;
-	memset(&hint, 0, sizeof(struct addrinfo));
-    	hint.ai_family = AF_UNSPEC;
-    	hint.ai_socktype = SOCK_STREAM;
-    	hint.ai_flags = AI_PASSIVE;
-	if(getaddrinfo(NULL, port, &hint, &address_list) != 0){
-		printf("error\n");
-		return 0;
-	}
-	
-	// i have no idea how to do bind
-	/*if(bind(sockfd, addr->ai_addr, addr->ai_addrlen) < 0) {
-		printf("error, socket bind failed\n");
-		return 0;
-	}*/
+	for (addr = address_list; addr != NULL; addr = addr->ai_next) {
+		if((sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol)) == -1) {
+			printf("error, socket could not be created\n");
+			return 0;
+		}
 
-	// this is for listen
-	if(listen(sockfd, BACKLOG) < 0) {
-		printf("error, listen failed\n");
+		if((bind(sockfd, addr->ai_addr, addr->ai_addrlen) == 0) && listen(sockfd, BACKLOG) == 0) {
+			break;
+		}
+
+		close(sockfd);
+
+	}
+
+	if(addr == NULL) {
+		printf("error, can't bind\n");
 		return 0;
 	}
+
+	freeaddrinfo(address_list);
 	
 	// this is for accept
 	struct connection *con;
@@ -72,6 +75,10 @@ int main(int argc, char** argv){
 		return 0;
 	}
 	
+	// the stuff i have below is just an idea for now,
+	// we could use pthreads if that's easier, but I
+	// definitely don't see how
+
 	// this part is for the actual read in
 	int valread;
 	char buffer[1024] = {0};
@@ -80,7 +87,7 @@ int main(int argc, char** argv){
 	valread = read(con->fd, buffer, 4);
 	char* temp = malloc(sizeof(char) * 5);
 	memcpy(temp, buffer, valread);
-	temp[valread] = '\0'
+	temp[valread] = '\0';
 	//read rest
 	if(strcmp(temp, "REG|") == 0) {
 		
@@ -93,7 +100,7 @@ int main(int argc, char** argv){
 
 
 
-	return 0;
+	return 1;
 
 
 }
