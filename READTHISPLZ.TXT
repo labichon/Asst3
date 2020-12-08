@@ -1,0 +1,9 @@
+I've been trying to set up this stupid connection all day
+and I can't, that's I think the biggest setback in this project.
+
+The read in part is not terribly difficult I don't think, I've set
+up a little bit of it in the server.c file
+
+
+Also, we can use multiple c files in our submission according to Piazza,
+we can just rename server.c or client.c to Asst3.c later

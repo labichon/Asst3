@@ -8,36 +8,34 @@
 
 
 //this is the client side
+//I'm fairly certain there's an error here
 
 int main(int argc, char** argv) {
 	
+	/*
 	char* start = "REG|12|Who's there?|";
 	char* setup = "REG|9|Who, who?|";
 	char* disgust = "REG|4|Ugh.|";
-
+*/
 	struct addrinfo hint, *address_list, *addr;
-	memset(&hint, 0, sizeof(struct addrinfo));
+	memset(&hint, 0, sizeof(hint));
     	hint.ai_family = AF_UNSPEC;
    	hint.ai_socktype = SOCK_STREAM;
     	
 	//argv[1] remote host
 	//argv[2] service, same as port in server.c
-	if(getaddrinfo(argv[1], argv[2], &hint, &address_list) != 0){
-                printf("error\n");
-                return 0;
-        }
+	getaddrinfo(argv[1], argv[2], &hint, &address_list);
 
 	int sockfd;
 	for (addr = address_list; addr != NULL; addr = addr->ai_next) {
-		if(sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol) < 0){
-			printf("error, socket not open\n");
-			return 0;
+		sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+		printf("%d\n", sockfd);
+		if(sockfd < 0){
+			continue;
 		}
-
 		if (connect(sockfd, addr->ai_addr, addr->ai_addrlen) == 0) {
 			break;
 		}
-
 		close(sockfd);
 	}
 
@@ -46,8 +44,11 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
+
 	freeaddrinfo(address_list);
 
-	return 1;
+	close(sockfd);
+
+	return EXIT_SUCCESS;
 
 }
