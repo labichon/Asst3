@@ -52,11 +52,13 @@ then length errors, then content errors.
         Sent Message: REG|30|I didn't know you were an owl!|
         Received message: Ugh.
 
-7) REG|||
-	- nothing in fields
+7) REG|12|Who's there?|REG|9|who, who.|
+	- content is different for 3rd message
 	- returns:
 	Sent Message: REG|13|Knock, knock.|
-	Sent Error Message: ERR|M1FT|
+	Received message: Who's there?
+	Sent Message: REG|4|Who.|
+	Sent Error Message: ERR|M3CT|
 
 8) REG|12|Who's there?|REG|8|Who, who?|
 	- incorrect length of message in third message
@@ -72,7 +74,7 @@ then length errors, then content errors.
 	Sent Message: REG|13|Knock, knock.|
 	Sent Error Message: ERR|M1FT|
 
-10) ERR|M1CT|
+10) ERR|4|M1CT|
 	- message is of an error form
 	- returns:
 	Sent Message: REG|13|Knock, knock.|
