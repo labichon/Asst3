@@ -10,15 +10,6 @@
 #define BACKLOG 10
 #define BUFSIZE 16
 
-//server side
-
-//struct made in example in class, might be useful
-struct connection {
-	struct sockaddr_storage addr;
-	socklen_t addr_len;
-	int fd;
-};
-
 int server(char *port);
 void *knockKnock(void *arg);
 int readRemote(int fd, char** str_ptr);
@@ -30,28 +21,22 @@ int main(int argc, char **argv)
 		printf("Usage: %s {port}\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
+
+	// pass port number into function
 	server(argv[1]);
 	return EXIT_SUCCESS;
 }
 
 
+/* int server(char* port)
+ * Inputs: port (name of port entered on command line)
+ * Outputs: int (never gets to return if successful
+ * 		returns EXIT_FAILURE if an error occurs)
+ * Functions: getaddrinfo, socket, bind, freeadrinfo, accept
+ * 		pthread_create, pthread_detach
+ */
 int server(char *port){
-/*
-	if(argc != 3) {
-		printf("error\n");
-		return 0;
-	}
-	*/
-	//service given in command line
-	//char* port = argv[1];
-
-	// char from server
-	/*
-	char* start = "REG|13|Knock, knock.|";
-	char* setup = "REG|4|Who.|";
-	char* punch = "REG|30|I didn't know you were an owl";
-*/
-
+	
 	// Set addressing info
 	struct addrinfo hint, *address_list, *addr;
 	memset(&hint, 0, sizeof(struct addrinfo));
@@ -95,14 +80,17 @@ int server(char *port){
 
 	// No longer need list of addresses to connect to
 	freeaddrinfo(address_list);
+	
 	printf("Waiting...\n");
+
 
 	// We have a socket bound and listening
 	// Ready to call accept
 	pthread_t tid;
 	while (1) {
 		// Wait an incoming connection with accept
-		// Don't care who we're talking pass connection as NULL
+		// Don't care who we're talking to:
+		// Pass connection as NULL
 		int confd = accept(sockfd, NULL, NULL);
 		if(confd == -1) {
 			printf("ERROR, accept failed\n");
@@ -123,18 +111,29 @@ int server(char *port){
 
 }
 
+
+/* void errHandler(int fd, char *msg, int retVal, int lineNum)
+ * Inputs: fd (file descriptor to read from),
+ *         *msg (message to be read),
+ *         retVal (determines indentifier in function),
+ *         lineNum (line number function is working with)
+ * Output: int (-1 if error, 1 otherwise)
+ */
 int errHandler(int fd, char *msg, int retVal, int lineNum) {
 	int originalLine = lineNum;
 	char *identifier;
 	
+	// Format error
 	if (retVal == -1) identifier = "FT";
 	else if (retVal == -2) {
 		char cmpStr[5] = "MXCT";
 		int validErr = 0;
 		
+		// Changing X for line number
 		cmpStr[1] = '0' - 1 + lineNum;
 		lineNum--;
 		
+		// Checks for content error
 		if (strcmp(msg, cmpStr) == 0) {
 			identifier = "CT";
 			validErr = 1;
@@ -142,6 +141,8 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 
 		cmpStr[2] = 'L';
 		cmpStr[3] = 'N';
+
+		// Checks for length error
 		if (strcmp(msg, cmpStr) == 0) {
 			identifier = "LN";
 			validErr = 1;
@@ -149,6 +150,8 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 
 		cmpStr[2] = 'F';
 		cmpStr[3] = 'T';
+
+		// Checks for format error
 		if (strcmp(msg, cmpStr) == 0) {
 			identifier = "FT";
 			validErr = 1;
@@ -156,6 +159,7 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 		
 		free(msg);
 
+		// If none of the above, it's a format error
 		if (!validErr) {
 			lineNum++;
 			identifier = "FT";
@@ -169,6 +173,7 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 	} else return 0;
 
 	if (originalLine == lineNum) {
+		// Writing correct error message
 		char errToSend[10] = "ERR|MXYY|\0";
 		errToSend[5] = '0' + lineNum;
 		errToSend[6] = identifier[0];
@@ -182,11 +187,22 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
  
 }
 
+
+/* int isPunct(char c)
+ * Input: c (character in question) 
+ * Output: int (1 if character is punctuation
+ * 		0 if character is not)
+ */
 int isPunct(char c) {
 	return c == '!' || c == '?' || c == '.';
 }
 
-//this is from class example
+
+/* void *knockKnock(void *arg)
+ * Input: *arg (argument passed in by pthread_create) 
+ * Output: NULL
+ * Function: Write, readRemote, errHandler
+ */
 void *knockKnock(void *arg) {
 	int fd = *((int *)arg);
 	char *msg;
@@ -200,14 +216,12 @@ void *knockKnock(void *arg) {
 	// Receive message from remote
 	// Should be Who's There?
 	err = readRemote(fd, &msg);
-
 	// Check for format/length errors
 	err = errHandler(fd, msg, err, 1);
 	// Check for content errors	
 	if (err >= 0 && strcmp(msg, "Who's there?") != 0) {
 		err = errHandler(fd, NULL, -3, 1);
 	}
-
 	if (err < 0) {
 		// Error, exit
 		close(fd);
@@ -215,34 +229,39 @@ void *knockKnock(void *arg) {
 	}
 	printf("Received message: %s\n", msg);
 	free(msg);
+
+
 	// Send line 2
 	char *line2 = "REG|4|Who.|";
 	write(fd, line2, strlen(line2));
 	printf("Sent Message: %s\n", line2);
-
+	
+	// Receive message from remote
+        // Should be Who, who?
 	err = readRemote(fd, &msg);
+	// Check for format/length errors
 	err = errHandler(fd, msg, err, 3);
-
+	// Check for content errors   
 	if (err >= 0 && strcmp(msg, "Who, who?") != 0) {
 		err = errHandler(fd, NULL, -3, 3);
 	}
-
 	if (err < 0) {
 		// Error, exit
 		close(fd);
 		return NULL;
 	}
-
 	printf("Received message: %s\n", msg);
 	free(msg);
 
+	// Send line 4
 	char *line4 = "REG|30|I didn't know you were an owl!|";
 	write(fd, line4, strlen(line4));
 	printf("Sent Message: %s\n", line4);
-	
+	// Receive message from remote
 	err = readRemote(fd, &msg);
+	// Check for format/length errors
 	err = errHandler(fd, msg, err, 5);
-
+	// Check for content errors   
 	if (err >= 0) {
 		int i;
 		for (i = 0; i < strlen(msg) - 1; i++) {
@@ -257,7 +276,6 @@ void *knockKnock(void *arg) {
 		if (!isPunct(msg[i])) err = -1;
 		if (err < 0) errHandler(fd, NULL, -3, 5);
 	}
-
 	if (err < 0) {
 		// Error, exit
 		close(fd);
@@ -266,7 +284,6 @@ void *knockKnock(void *arg) {
 
 	printf("Received message: %s\n", msg);
 	free(msg);
-
 	close(fd);
 
 	return NULL;
