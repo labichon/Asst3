@@ -122,6 +122,7 @@ int server(char *port){
 int errHandler(int fd, char *msg, int retVal, int lineNum) {
 	int originalLine = lineNum;
 	char *identifier;
+	char *errStr;
 	
 	// Format error
 	if (retVal == -1) identifier = "FT";
@@ -137,6 +138,7 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 		if (strcmp(msg, cmpStr) == 0) {
 			identifier = "CT";
 			validErr = 1;
+			errStr = "content was not correct";
 		} 
 
 		cmpStr[2] = 'L';
@@ -146,6 +148,7 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 		if (strcmp(msg, cmpStr) == 0) {
 			identifier = "LN";
 			validErr = 1;
+			errStr = "length value was not correct";
 		}
 
 		cmpStr[2] = 'F';
@@ -155,6 +158,7 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 		if (strcmp(msg, cmpStr) == 0) {
 			identifier = "FT";
 			validErr = 1;
+			errStr = "format was broken";
 		}
 		
 		free(msg);
@@ -181,7 +185,7 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
 		write(fd, errToSend, strlen(errToSend));
 		printf("Sent Error Message: %s\n", errToSend);
 	} else {
-		printf("Received Error: M%d%s\n", lineNum, identifier);	
+		printf("Received Error (M%d%s): Message %d %s\n", lineNum, identifier, lineNum, errStr);	
 	}
 	return -1;
  
