@@ -106,7 +106,7 @@ int server(char *port){
 		int confd = accept(sockfd, NULL, NULL);
 		if(confd == -1) {
 			printf("ERROR, accept failed\n");
-			return EXIT_FAILURE;
+			continue;
 		}
 		
 		// Successfully connected, create thread to joke with
@@ -121,62 +121,12 @@ int server(char *port){
 		pthread_detach(tid);
 	}
 
-
-	//char* who = "Who's there?";
-	// this part is for the read in
-	/*
-	int valread;
-	char buffer[1024] = {0};
-	
-	//read in first 4 characters which should be REG| or ERR|
-	valread = read(con->fd, buffer, 4);
-	char* temp = malloc(sizeof(char) * 5);
-	memcpy(temp, buffer, valread);
-	temp[valread] = '\0';
-	//read rest
-	if(strcmp(temp, "REG|") == 0) {
-		valread = read(con->fd, buffer, 1);
-		temp[0] = buffer[0];
-		valread = read(con->fd, buffer, 1);
-                temp[1] = buffer[0];
-		valread = read(con->fd, buffer, 1);
-                if(buffer[0] != '|'){ //wrong character
-			if(isdigit(buffer[0])) {
-				//2 digits in a row, certain error
-			} else {
-				//some other character besides |
-			}
-		} else {
-			temp[2] = '\0';
-			int length = atoi(temp);
-			if(length != 12) { //reference to line: Who's there?
-				//wrong length
-			} else {
-				int i = 0;
-				while (i < 12) {
-					valread = read(con->fd, buffer, 1);
-					if(buffer[0] != who[i]){
-						//message content don't match
-					}
-					i++;	
-				}
-				valread = read(con->fd, buffer, 1);
-				if(buffer[0] != '|') {
-					//missing last |
-				}
-			}	
-		}	
-	} else if (strcmp(temp, "ERR|") == 0) {
-	
-	}
-	
-	return 1;
-
-	*/	
 }
 
-int errHandler(char *msg, int retVal, int lineNum) {
+int errHandler(int fd, char *msg, int retVal, int lineNum) {
+	int originalLine = lineNum;
 	char *identifier;
+	
 	if (retVal == -1) identifier = "FT";
 	else if (retVal == -2) {
 		char cmpStr[5] = "MXCT";
@@ -211,13 +161,23 @@ int errHandler(char *msg, int retVal, int lineNum) {
 			identifier = "FT";
 		}
 	
+	} else if (retVal == -3) {
+		identifier = "CT";
 	} else if (strlen(msg) != retVal) {
 		identifier = "LN";
 		free(msg);
 	} else return 0;
 
-
-	printf("M%d%s\n", lineNum, identifier);	
+	if (originalLine == lineNum) {
+		char errToSend[10] = "ERR|MXYY|\0";
+		errToSend[5] = '0' + lineNum;
+		errToSend[6] = identifier[0];
+		errToSend[7] = identifier[1];
+		write(fd, errToSend, strlen(errToSend));
+		printf("Sent Error Message: %s\n", errToSend);
+	} else {
+		printf("Received Error: M%d%s\n", lineNum, identifier);	
+	}
 	return -1;
  
 }
@@ -238,11 +198,10 @@ void *knockKnock(void *arg) {
 	err = readRemote(fd, &msg);
 
 	// Check for format/length errors
-	err = errHandler(msg, err, 1);
+	err = errHandler(fd, msg, err, 1);
 	// Check for content errors	
 	if (err >= 0 && strcmp(msg, "Who's there?") != 0) {
-		printf("M1CT\n");
-		err = -1;
+		err = errHandler(fd, NULL, -3, 1);
 	}
 
 	if (err < 0) {
@@ -258,11 +217,10 @@ void *knockKnock(void *arg) {
 	printf("Sent Message: %s\n", line2);
 
 	err = readRemote(fd, &msg);
-	err = errHandler(msg, err, 3);
+	err = errHandler(fd, msg, err, 3);
 
 	if (err >= 0 && strcmp(msg, "Who, who?") != 0) {
-		printf("M3CT\n");
-		err = -1;
+		err = errHandler(fd, NULL, -3, 3);
 	}
 
 	if (err < 0) {
@@ -279,18 +237,19 @@ void *knockKnock(void *arg) {
 	printf("Sent Message: %s\n", line4);
 	
 	err = readRemote(fd, &msg);
-	err = errHandler(msg, err, 5);
+	err = errHandler(fd, msg, err, 5);
 
 	if (err >= 0) {
 		int i;
 		for (i = 0; i < strlen(msg) - 1; i++) {
-			if (!isalpha(msg[i])) {
+			if (!isalpha(msg[i]) && !isspace(msg[i])
+			    && !ispunct(msg[i])) {
 				err = -1;
 				break;
 			}
 		}
 		if (!ispunct(msg[i])) err = -1;
-		if (err < 0) printf("M5CT\n");
+		if (err < 0) errHandler(fd, NULL, -3, 5);
 	}
 
 	if (err < 0) {
