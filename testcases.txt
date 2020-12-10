@@ -1,0 +1,55 @@
+Testcases:
+
+We did 10 testcases.
+In general, our code finds formatting errors first
+then length errors, then content errors.
+
+1) REG|12|Who's there?|
+	- formatted correctly
+	- sends next message
+
+2) Who's there?
+	- no ERR or REG beforehand (no code)
+	- Error Message: ERR|M1FT|
+	- incorrect formatting in first message
+
+3) REG|12Who's there?
+	- incorrect placements of |
+	- Error Message: ERR|M1FT|
+	- incorrect formatting in first message
+
+4) REG|6|Who's there?|
+	- length of message does not match with
+		actual length
+	- Error Message: ERR|M1FT|
+	- incorrect formatting in first message
+
+5) REG|12|Who|
+	- actual length of message does not match
+		with length of message
+	- Error Message: ERR|M1LN|
+	- incorrect length value in first message
+
+6) REG|12|who.s there!|
+	- message content is wrong
+	- Error Message: ERR|M1CT|
+	- incorrect content in first message
+
+7) REG|||
+	- nothing in fields
+	- Error Message: ERR|M1FT|
+	- incorrect content in first message
+
+8) REG|12|Who's there?|REG|8|Who, who?|
+	- incorrect length of message in third message
+	- Error Message: ERR|M3FT|
+	- incorrect formatting in third message
+
+9) REG|FOURTEEN|Who's there?
+	- length of message is not a numeric character
+	- Error Message: ERR|M1FT|
+	- incorrect formatting in first message
+
+10) ERR|M1CT|
+	- message is of an error form
+	- Message: received error of form M1CT
