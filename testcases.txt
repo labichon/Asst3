@@ -4,7 +4,7 @@ We did 10 testcases.
 In general, our code finds formatting errors first
 then length errors, then content errors.
 
-1) REG|12|Who's there?|
+1) REG|12|Who's there?|REG|9|Who, who?|REG|4|Ugh.|
 	- formatted correctly
 	- sends next message
 
@@ -18,10 +18,10 @@ then length errors, then content errors.
 	- Error Message: ERR|M1FT|
 	- incorrect formatting in first message
 
-4) REG|6|Who's there?|
+4) REG|12|Who's there?|REG|5|Who, who?|
 	- length of message does not match with
-		actual length
-	- Error Message: ERR|M1FT|
+		actual length for Who, who?
+	- Error Message: ERR|M3FT|
 	- incorrect formatting in first message
 
 5) REG|12|Who|
@@ -30,10 +30,10 @@ then length errors, then content errors.
 	- Error Message: ERR|M1LN|
 	- incorrect length value in first message
 
-6) REG|12|who.s there!|
+6) REG|12|Who's there?|REG|9|Who, who?|REG|4|ugh!|
 	- message content is wrong
-	- Error Message: ERR|M1CT|
-	- incorrect content in first message
+	- Error Message: ERR|M5CT|
+	- incorrect content in fifth message
 
 7) REG|||
 	- nothing in fields
