@@ -6,50 +6,75 @@ then length errors, then content errors.
 
 1) REG|12|Who's there?|REG|9|Who, who?|REG|4|Ugh.|
 	- formatted correctly
-	- sends next message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Received message: Who's there?
+	Sent Message: REG|4|Who.|
+	Received message: Who, who?
+	Sent Message: REG|30|I didn't know you were an owl!|
+	Received message: Ugh.
 
 2) Who's there?
 	- no ERR or REG beforehand (no code)
-	- Error Message: ERR|M1FT|
-	- incorrect formatting in first message
+	- returns: 
+	Sent Message: REG|13|Knock, knock.|
+	Sent Error Message: ERR|M1FT|
 
 3) REG|12Who's there?
 	- incorrect placements of |
-	- Error Message: ERR|M1FT|
-	- incorrect formatting in first message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Sent Error Message: ERR|M1FT|
 
 4) REG|12|Who's there?|REG|5|Who, who?|
 	- length of message does not match with
 		actual length for Who, who?
-	- Error Message: ERR|M3FT|
-	- incorrect formatting in first message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Received message: Who's there?
+	Sent Message: REG|4|Who.|
+	Sent Error Message: ERR|M3FT|
 
 5) REG|12|Who|
 	- actual length of message does not match
 		with length of message
-	- Error Message: ERR|M1LN|
-	- incorrect length value in first message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Sent Error Message: ERR|M1LN|
 
 6) REG|12|Who's there?|REG|9|Who, who?|REG|4|ugh!|
-	- message content is wrong
-	- Error Message: ERR|M5CT|
-	- incorrect content in fifth message
+	- message content is correct
+	- returns:	
+	Sent Message: REG|13|Knock, knock.|
+        Received message: Who's there?
+        Sent Message: REG|4|Who.|
+        Received message: Who, who?
+        Sent Message: REG|30|I didn't know you were an owl!|
+        Received message: Ugh.
 
 7) REG|||
 	- nothing in fields
-	- Error Message: ERR|M1FT|
-	- incorrect content in first message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Sent Error Message: ERR|M1FT|
 
 8) REG|12|Who's there?|REG|8|Who, who?|
 	- incorrect length of message in third message
-	- Error Message: ERR|M3FT|
-	- incorrect formatting in third message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Received message: Who's there?
+	Sent Message: REG|4|Who.|
+	Sent Error Message: ERR|M3FT|
 
 9) REG|FOURTEEN|Who's there?
 	- length of message is not a numeric character
-	- Error Message: ERR|M1FT|
-	- incorrect formatting in first message
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Sent Error Message: ERR|M1FT|
 
 10) ERR|M1CT|
 	- message is of an error form
-	- Message: received error of form M1CT
+	- returns:
+	Sent Message: REG|13|Knock, knock.|
+	Sent Error Message: ERR|M1FT|
+
