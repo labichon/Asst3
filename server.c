@@ -182,6 +182,10 @@ int errHandler(int fd, char *msg, int retVal, int lineNum) {
  
 }
 
+int isPunct(char c) {
+	return c == '!' || c == '?' || c == '.';
+}
+
 //this is from class example
 void *knockKnock(void *arg) {
 	int fd = *((int *)arg);
@@ -243,12 +247,12 @@ void *knockKnock(void *arg) {
 		int i;
 		for (i = 0; i < strlen(msg) - 1; i++) {
 			if (!isalpha(msg[i]) && !isspace(msg[i])
-			    && !ispunct(msg[i])) {
+			    && !isPunct(msg[i]) && msg[i] != ',') {
 				err = -1;
 				break;
 			}
 		}
-		if (!ispunct(msg[i])) err = -1;
+		if (!isPunct(msg[i])) err = -1;
 		if (err < 0) errHandler(fd, NULL, -3, 5);
 	}
 
