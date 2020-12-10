@@ -247,7 +247,9 @@ void *knockKnock(void *arg) {
 		int i;
 		for (i = 0; i < strlen(msg) - 1; i++) {
 			if (!isalpha(msg[i]) && !isspace(msg[i])
-			    && !isPunct(msg[i]) && msg[i] != ',') {
+			    && !isPunct(msg[i]) && msg[i] != ','
+			    && msg[i] != '-' && msg[i] != '\''
+			    && msg[i] != '(' && msg[i] != ')') {
 				err = -1;
 				break;
 			}
@@ -290,6 +292,8 @@ int readRemote(int fd, char** str_ptr) {
 	int msgLen = -1;
 
 	while ((bytes = read(fd, buf, 1)) > 0) {
+		// Note: This inner loop only has one iteration
+		// It is only here in case we change the implementatin
 		for (int i = 0; i < bytes; i++) {
 			// Insert current char into currStr buffer
 			if (used == size) {
