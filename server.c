@@ -7,24 +7,31 @@
 #include <pthread.h>
 #include <ctype.h>
 
-#define BACKLOG 5
+#define BACKLOG 10
+#define BUFSIZE 16
 
 //server side
 
 //struct made in example in class, might be useful
 struct connection {
-    struct sockaddr_storage addr;
-    socklen_t addr_len;
-    int fd;
+	struct sockaddr_storage addr;
+	socklen_t addr_len;
+	int fd;
 };
 
 int server(char *port);
-void *echo(void *arg);
+void *knockKnock(void *arg);
+int readRemote(int fd, char** str_ptr);
 
 int main(int argc, char **argv)
 {
-    (void) server(argv[1]);
-    return EXIT_SUCCESS;
+	// argv[1] is the port number
+	if (argc != 2) {
+		printf("Usage: %s {port}\n", argv[0]);
+		exit(EXIT_FAILURE);
+	}
+	server(argv[1]);
+	return EXIT_SUCCESS;
 }
 
 
@@ -44,62 +51,80 @@ int server(char *port){
 	char* setup = "REG|4|Who.|";
 	char* punch = "REG|30|I didn't know you were an owl";
 */
-	char* who = "Who's there?";
 
-
+	// Set addressing info
 	struct addrinfo hint, *address_list, *addr;
-        memset(&hint, 0, sizeof(struct addrinfo));
-        hint.ai_family = AF_UNSPEC;
-        hint.ai_socktype = SOCK_STREAM;
-        hint.ai_flags = AI_PASSIVE;
-        if(getaddrinfo(NULL, port, &hint, &address_list) != 0){
-                printf("error\n");
-                return 0;
-        }
+	memset(&hint, 0, sizeof(struct addrinfo));
+	hint.ai_family = AF_UNSPEC;
+	hint.ai_socktype = SOCK_STREAM;
+	hint.ai_flags = AI_PASSIVE;
 
-	//socket creation
+	// Create and format addressing info using given port on localhost
+	int err = getaddrinfo(NULL, port, &hint, &address_list);
+	if (err != 0){
+		printf("getaddrinfo ERROR: %s\n", gai_strerror(err));
+		return EXIT_FAILURE;
+	}
+
+	// Create a socket using address info
 	int sockfd;
 	for (addr = address_list; addr != NULL; addr = addr->ai_next) {
+		// Attempt creation of socket
 		if((sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol)) == -1) {
-			printf("error, socket could not be created\n");
-			return 0;
+			// Try the next address if we can't create the socket
+			continue;
 		}
 
+		// Try to bind and listen
 		if((bind(sockfd, addr->ai_addr, addr->ai_addrlen) == 0) && listen(sockfd, BACKLOG) == 0) {
+			// On success, break out of the loop
 			break;
 		}
-
+		
+		// Socket didn't work, try next
 		close(sockfd);
 
 	}
 
+	// Ended loop without succeeding
 	if(addr == NULL) {
-		printf("error, can't bind\n");
-		return 0;
+		printf("ERROR, can't bind any socket\n");
+		freeaddrinfo(address_list);
+		return EXIT_FAILURE;
 	}
 
+	// No longer need list of addresses to connect to
 	freeaddrinfo(address_list);
-	printf("waiting\n");	
+	printf("Waiting...\n");
 
-	// this is for accept
-	struct connection *con;
+	// We have a socket bound and listening
+	// Ready to call accept
 	pthread_t tid;
-	for(;;){
-		con = malloc(sizeof(struct connection));
-		con->addr_len = sizeof(struct sockaddr_storage);
-		con->fd = accept(sockfd, (struct sockaddr *) &con->addr, &con->addr_len);
-		printf("%d\n", con->fd);
-		if(con->fd == -1) {
-			printf("error, accept failed\n");
-			return 0;
+	while (1) {
+		// Wait an incoming connection with accept
+		// Don't care who we're talking pass connection as NULL
+		int confd = accept(sockfd, NULL, NULL);
+		if(confd == -1) {
+			printf("ERROR, accept failed\n");
+			return EXIT_FAILURE;
 		}
-
-		pthread_create(&tid, NULL, echo, con);
 		
+		// Successfully connected, create thread to joke with
+		err = pthread_create(&tid, NULL, knockKnock, &confd);
+		if (err != 0) {
+			perror("Could not create thread:");
+			close(confd);
+			continue;
+		}
+		
+		// Detach thread and wait for next connection
+		pthread_detach(tid);
 	}
 
 
+	//char* who = "Who's there?";
 	// this part is for the read in
+	/*
 	int valread;
 	char buffer[1024] = {0};
 	
@@ -144,36 +169,217 @@ int server(char *port){
 	} else if (strcmp(temp, "ERR|") == 0) {
 	
 	}
-
+	
 	return 1;
+
+	*/	
 }
 
+int errHandler(char *msg, int retVal, int lineNum) {
+	char *identifier;
+	if (retVal == -1) identifier = "FT";
+	else if (retVal == -2) {
+		char cmpStr[5] = "MXCT";
+		int validErr = 0;
+		
+		cmpStr[1] = '0' - 1 + lineNum;
+		lineNum--;
+		
+		if (strcmp(msg, cmpStr) == 0) {
+			identifier = "CT";
+			validErr = 1;
+		} 
+
+		cmpStr[2] = 'L';
+		cmpStr[3] = 'N';
+		if (strcmp(msg, cmpStr) == 0) {
+			identifier = "LN";
+			validErr = 1;
+		}
+
+		cmpStr[2] = 'F';
+		cmpStr[3] = 'T';
+		if (strcmp(msg, cmpStr) == 0) {
+			identifier = "FT";
+			validErr = 1;
+		}
+		
+		free(msg);
+
+		if (!validErr) {
+			lineNum++;
+			identifier = "FT";
+		}
+	
+	} else if (strlen(msg) != retVal) {
+		identifier = "LN";
+		free(msg);
+	} else return 0;
+
+
+	printf("M%d%s\n", lineNum, identifier);	
+	return -1;
+ 
+}
 
 //this is from class example
-void *echo(void *arg) {
-   	char host[100], port[10], buf[101];
-    	struct connection *c = (struct connection *) arg;
-    	int error, nread;
+void *knockKnock(void *arg) {
+	int fd = *((int *)arg);
+	char *msg;
+	int err;
 
-    	error = getnameinfo((struct sockaddr *) &c->addr, c->addr_len, host, 100, port, 10, NI_NUMERICSERV);
-    
-    	if (error != 0) {
-        	fprintf(stderr, "getnameinfo: %s", gai_strerror(error));
-        	close(c->fd);
-        	return NULL;
-    	}
+	// Line 1
+	char *line0 = "REG|13|Knock, knock.|";
+	write(fd, line0, strlen(line0));
+	printf("Sent Message: %s\n", line0);
+	
+	// Receive message from remote
+	// Should be Who's There?
+	err = readRemote(fd, &msg);
 
-    	printf("[%s:%s] connection\n", host, port);
+	// Check for format/length errors
+	err = errHandler(msg, err, 1);
+	// Check for content errors	
+	if (err >= 0 && strcmp(msg, "Who's there?") != 0) {
+		printf("M1CT\n");
+		err = -1;
+	}
 
-    	while ((nread = read(c->fd, buf, 100)) > 0) {
-        	buf[nread] = '\0';
-        	printf("[%s:%s] read %d bytes |%s|\n", host, port, nread, buf);
-    	}
+	if (err < 0) {
+		// Error, exit
+		close(fd);
+		return NULL;
+	}
+	printf("Received message: %s\n", msg);
+	free(msg);
+	// Send line 2
+	char *line2 = "REG|4|Who.|";
+	write(fd, line2, strlen(line2));
+	printf("Sent Message: %s\n", line2);
 
-    	printf("[%s:%s] got EOF\n", host, port);
+	err = readRemote(fd, &msg);
+	err = errHandler(msg, err, 3);
 
-    	close(c->fd);
-    	free(c);
-    	return NULL;
+	if (err >= 0 && strcmp(msg, "Who, who?") != 0) {
+		printf("M3CT\n");
+		err = -1;
+	}
+
+	if (err < 0) {
+		// Error, exit
+		close(fd);
+		return NULL;
+	}
+
+	printf("Received message: %s\n", msg);
+	free(msg);
+
+	char *line4 = "REG|30|I didn't know you were an owl!|";
+	write(fd, line4, strlen(line4));
+	printf("Sent Message: %s\n", line4);
+	
+	err = readRemote(fd, &msg);
+	err = errHandler(msg, err, 5);
+
+	if (err >= 0) {
+		int i;
+		for (i = 0; i < strlen(msg) - 1; i++) {
+			if (!isalpha(msg[i])) {
+				err = -1;
+				break;
+			}
+		}
+		if (!ispunct(msg[i])) err = -1;
+		if (err < 0) printf("M5CT\n");
+	}
+
+	if (err < 0) {
+		// Error, exit
+		close(fd);
+		return NULL;
+	}
+
+	printf("Received message: %s\n", msg);
+	free(msg);
+
+	close(fd);
+
+	return NULL;
+}
+
+/* int readRemote(int fd, char** str_ptr)
+ * Inputs: fd (file descriptor to read from), 
+ *         str_ptr (pointer to a str to write to)
+ * Outputs: int (Length if correct format, -1 if format error
+ *          -2 if error msg but formatted correctly
+ * Function: Read
+ */
+int readRemote(int fd, char** str_ptr) {
+	
+	int bytes, type = 0, errVal = 0;
+	
+	// Create buffer
+	char buf[1];
+	int size = BUFSIZE;
+	char *currStr = malloc(size);
+	int used = 0;
+	
+	int msgLen = -1;
+
+	while ((bytes = read(fd, buf, 1)) > 0) {
+		for (int i = 0; i < bytes; i++) {
+			// Insert current char into currStr buffer
+			if (used == size) {
+				size *= 2;
+				currStr = realloc(currStr, size);
+			}
+			currStr[used++] = buf[i];
+			
+			/* type corresponds to the part of the string
+			 * we are reading in:
+			 * 0 - Undecided (1st part, ERR or REG)
+			 * 1 - REG string, reading length
+			 * 2 - REG/ERR string, reading content
+			 * 3 - Finished string - removed
+			 * -1 - ERR string
+			*/ 
+			if (type == -1) {
+				errVal = -2;
+				type = 2;
+			}
+			if (type == 0) { // Type undecided (yet)
+				if (used == 4) {
+					// 4 chars in buffer
+					// Check the type we should set or return error
+					if (memcmp(currStr, "REG|", 4) == 0) type = 1;
+					else if (memcmp(currStr, "ERR|", 4) == 0) type = -1;
+					else return -1;
+					used = 0;
+				} else if (buf[i] == '|') return -1;
+			} else if (type == 1) { 
+				// Reading in msg len
+				// Read in numbers until we hit '|'
+				if (buf[i] == '|') {
+					if (used == 1) return -1;
+					// Set length
+					type = 2;
+					currStr[used - 1] = '\0';
+					msgLen = atoi(currStr);
+					used = 0;
+				} else if (!isdigit(buf[i])) return -1;
+			} else if (type == 2) { // Read in actual msg
+				if (buf[i] == '|') {
+					// Make string shortest possible length and set end to '\0'
+					currStr = realloc(currStr, used);
+					currStr[used - 1] = '\0';
+					*str_ptr = currStr;
+					return (errVal == 0) ? msgLen : errVal;
+				} else if (used == msgLen + 1) return -1;
+			}
+		}
+	}
+	
+	// Did not get a fully formatted message
+	return -1;
 }
 
